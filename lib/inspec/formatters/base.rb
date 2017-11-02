@@ -21,7 +21,8 @@ module Inspec
       #
       # each formatter must implement #close which is where the report will be output
       def close(_notification)
-        raise NotImplementedError, "#{self.class} must implement a `#close` method to format its output."
+        puts "***LEFF: formatter is closed"
+        #raise NotImplementedError, "#{self.class} must implement a `#close` method to format its output."
       end
 
       # RSpec Override: #dump_summary
@@ -33,7 +34,7 @@ module Inspec
           duration: summary.duration,
         }
       end
-    
+
       # RSpec Override: #stop
       #
       # Called at the end of a complete RSpec run.
@@ -48,13 +49,13 @@ module Inspec
           format_example(example).tap do |hash|
             e = example.exception
             next unless e
-    
+
             if example.metadata[:sensitive]
               hash[:message] = '*** sensitive output suppressed ***'
             else
               hash[:message] = exception_message(e)
             end
-    
+
             next if e.is_a? RSpec::Expectations::ExpectationNotMetError
             hash[:exception] = e.class.name
             hash[:backtrace] = e.backtrace
@@ -83,9 +84,14 @@ module Inspec
       def add_profile(profile)
         @profiles.push(profile)
       end
-    
+
+      # Return all the collected output to the caller
+      def results
+        run_data
+      end
+
       private
-    
+
       def exception_message(exception)
         if exception.is_a?(RSpec::Core::MultipleExceptionError)
           exception.all_exceptions.map(&:message).uniq.join("\n\n")
@@ -93,7 +99,7 @@ module Inspec
           exception.message
         end
       end
-    
+
       # RSpec Override: #format_example
       #
       # Called after test execution, this allows us to populate our own hash with data
@@ -106,7 +112,7 @@ module Inspec
         else
           code_description = example.metadata[:full_description]
         end
-    
+
         res = {
           id: example.metadata[:id],
           profile_id: example.metadata[:profile_id],
@@ -117,17 +123,17 @@ module Inspec
           resource_title: example.metadata[:described_class],
           expectation_message: format_expectation_message(example),
         }
-    
+
         unless (pid = example.metadata[:profile_id]).nil?
           res[:profile_id] = pid
         end
-    
+
         if res[:status] == 'pending'
           res[:status] = 'skipped'
           res[:skip_message] = example.metadata[:description]
           res[:resource] = example.metadata[:described_class].to_s
         end
-    
+
         res
       end
 
@@ -143,7 +149,7 @@ module Inspec
         return nil if @backend.nil?
         @backend.os.params[field]
       end
-    
+
       def all_unique_controls
         return @unique_controls unless @unique_controls.nil?
 
@@ -154,7 +160,7 @@ module Inspec
 
         @unique_controls
       end
-    
+
       def profile_summary
         return @profile_summary unless @profile_summary.nil?
 
@@ -164,7 +170,7 @@ module Inspec
         critical = 0
         major = 0
         minor = 0
-    
+
         all_unique_controls.each do |control|
           next if control[:id].start_with? '(generated from '
           next unless control[:results]
@@ -183,9 +189,9 @@ module Inspec
             passed += 1
           end
         end
-    
+
         total = failed + passed + skipped
-    
+
         @profile_summary = {
           'total' => total,
           'failed' => {
@@ -198,7 +204,7 @@ module Inspec
           'passed' => passed,
         }
       end
-    
+
       def tests_summary
         return @tests_summary unless @tests_summary.nil?
 
@@ -206,7 +212,7 @@ module Inspec
         failed = 0
         skipped = 0
         passed = 0
-    
+
         all_unique_controls.each do |control|
           next unless control[:results]
           control[:results].each do |result|
@@ -219,47 +225,47 @@ module Inspec
             end
           end
         end
-    
+
         @test_summary = { 'total' => total, 'failed' => failed, 'skipped' => skipped, 'passed' => passed }
       end
-    
+
       def examples
         run_data[:controls]
       end
-    
+
       def examples_without_controls
         examples.find_all { |example| example2control(example).nil? }
       end
-    
+
       def examples_with_controls
         examples.find_all { |example| !example2control(example).nil? }
       end
-    
+
       def profiles_info
         @profiles_info ||= @profiles.map(&:info!).map(&:dup)
       end
-    
+
       def example2control(example)
         profile = profile_from_example(example)
         return nil unless profile && profile[:controls]
         profile[:controls].find { |x| x[:id] == example[:id] }
       end
-    
+
       def profile_from_example(example)
         profiles_info.find { |p| profile_contains_example?(p, example) }
       end
-    
+
       def profile_contains_example?(profile, example)
         profile_name = profile[:name]
         example_profile_id = example[:profile_id]
-    
+
         # if either the profile name is nil or the profile in the given example
         # is nil, assume the profile doesn't contain the example and default
         # to creating a new profile. Otherwise, for profiles that have no
         # metadata, this may incorrectly match a profile that does not contain
         # this example, leading to Ruby exceptions.
         return false if profile_name.nil? || example_profile_id.nil?
-    
+
         # The correct profile is one where the name of the profile, and the profile
         # name in the example match. Additionally, the list of controls in the
         # profile must contain the example in question (which we match by ID).
@@ -271,7 +277,7 @@ module Inspec
         # creates a fake profile with a name like "tests from /path/to/tests")
         profile_name == example_profile_id && profile[:controls].any? { |control| control[:id] == example[:id] }
       end
-    
+
       def move_example_into_control(example, control)
         control[:results] ||= []
         example.delete(:id)

@@ -74,6 +74,7 @@ module Inspec
     def run(with = nil)
       with ||= RSpec::Core::Runner.new(nil)
       with.run_specs(tests)
+      require 'pry'; binding.pry
     end
 
     # Provide an output hash of the run's report
