@@ -30,12 +30,26 @@ module Inspec::Resources
     def [](name)
       # convert string to symbol
       name = name.to_sym if name.is_a? String
+      return self.name if name == :name
+
       inspec.backend.os[name]
+    end
+
+    def name
+      name = inspec.backend.os[:name]
+
+      # convert string to downcase
+      # TODO: Remove for inspec 2.0
+      unless inspec.backend.os.name_updated.nil?
+        update = inspec.backend.os.name_updated
+        Inspec::Log.warn "[DEPRECATED] Platform names will become lowercase in InSpec 2.0. Please match on '#{update.last}' instead of '#{update.first}'"
+      end
+      name
     end
 
     # add helper methods for easy access of properties
     # allows users to use os.name, os.family, os.release, os.arch
-    %w{name family release arch}.each do |property|
+    %w{family release arch}.each do |property|
       define_method(property.to_sym) do
         inspec.backend.os[property.to_sym]
       end
@@ -44,7 +58,7 @@ module Inspec::Resources
     # helper to collect a hash object easily
     def params
       {
-        name: inspec.backend.os[:name],
+        name: name,
         family: inspec.backend.os[:family],
         release: inspec.backend.os[:release],
         arch: inspec.backend.os[:arch],
